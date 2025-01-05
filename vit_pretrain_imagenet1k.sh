@@ -1,11 +1,18 @@
+#!/bin/bash
+
 models=("vit_tiny_patch16_224" "vit_small_patch16_224" "vit_base_patch16_224")
 lrs=("0.0001" "0.0003" "0.001" "0.003" "0.01")
 
 for model in "${models[@]}"; do
   for lr in "${lrs[@]}"; do
-    ./distributed_train.sh 1 \
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 \
       --model $model \
-      --data-dir /scratch/x3135a05/imagenet1k/ \
+      --dataset imagenet \
+      --data-dir ~/data/imagenet1k \
+      --mean 0.485, 0.456, 0.406 --std 0.229, 0.224, 0.225 \
+      --num-classes 1000 \
+      --img-size 224 \
+      --batch-size 1024 \
       --epochs 300 \
       --lr $lr \
       --warmup-epochs 10 \
@@ -15,11 +22,11 @@ for model in "${models[@]}"; do
       --smoothing 0.1 \
       --sched cosine \
       --opt adamw \
-      --batch-size 1024 \
       --drop-path 0.1 \
-      --seed 42 \
-      --log-interval 30 \
+      --seed 1234 \
+      --log-interval 1 \
       --output ./output/${model}_lr${lr} \
-      --log-wandb
+      --log-wandb \
+      --experiment IMAGENET1K
   done
 done

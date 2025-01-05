@@ -1001,13 +1001,9 @@ def main():
             else:
                 latest_metric = train_metrics[eval_metric]
 
-            # if saver is not None:
-            #     # save proper checkpoint with eval metric
-            #     best_metric, best_epoch = saver.save_checkpoint(epoch, metric=latest_metric)
-
-            # QWER
-            if saver is not None and epoch % (num_epochs // 5) == 0:  # Every epoch/5
-                saver.save_checkpoint(epoch, metric=latest_metric)
+            if saver is not None:
+                # save proper checkpoint with eval metric
+                best_metric, best_epoch = saver.save_checkpoint(epoch, metric=latest_metric)
 
             if lr_scheduler is not None:
                 # step LR for next epoch

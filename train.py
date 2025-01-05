@@ -1123,9 +1123,9 @@ def train_one_epoch(
                 if utils.is_primary(args) and args.log_wandb:
                     # Log total and per-layer gradient norms
                     wandb.log({
-                        'train_grad_norm/total': total_grad_norm,
-                        'train_param_norm': total_param_norm,
-                        **{f'train_grad_norm/{layer}': norm for layer, norm in layer_grad_norms.items()}
+                        'train/grad_norm': total_grad_norm,
+                        'train/param_norm': total_param_norm,
+                        **{f'train_layer_grad_norm/{layer}': norm for layer, norm in layer_grad_norms.items()}
                     })
 
                 if need_update:

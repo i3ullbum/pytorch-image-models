@@ -393,6 +393,55 @@ group.add_argument('--wandb-tags', default=[], type=str, nargs='+',
 group.add_argument('--wandb-resume-id', default='', type=str, metavar='ID',
                    help='If resuming a run, the id of the run in wandb')
 
+# QWER
+def compute_grad_norms(model):
+    """
+    Returns:
+      total_grad_norm (float): The L2 norm of all parameters' gradients.
+      layer_grad_norms (dict): Mapping from layer-name -> L2 grad norm for that layer.
+    """
+    total_norm_sqr = 0.0
+    layer_grad_norms = {}
+    for name, p in model.named_parameters():
+        if p.grad is not None:
+            gn = p.grad.data.norm(2).item()
+            layer_grad_norms[name] = gn
+            total_norm_sqr += gn * gn
+
+    total_grad_norm = total_norm_sqr ** 0.5
+    return total_grad_norm
+
+def compute_layer_grad_norms(model):
+    """
+    Compute gradient norms for each layer (aggregated over all parameters in the layer).
+
+    Args:
+      model (nn.Module): The model being trained.
+
+    Returns:
+      dict: Mapping from layer name to gradient norm (L2 norm).
+    """
+    layer_grad_norms = {}
+    for name, module in model.named_modules():
+        # Aggregate gradient norms for all parameters in this layer
+        total_grad_norm_sqr = 0.0
+        for param in module.parameters(recurse=False):  # Only parameters in this module, not submodules
+            if param.grad is not None:
+                total_grad_norm_sqr += param.grad.data.norm(2).item() ** 2
+        total_grad_norm = total_grad_norm_sqr ** 0.5
+        if total_grad_norm > 0:
+            layer_grad_norms[name] = total_grad_norm
+    return layer_grad_norms
+
+# QWER
+def compute_param_norm(model):
+    """Return total param norm for entire model."""
+    total_norm_sqr = 0.0
+    for p in model.parameters():
+        param_norm = p.data.norm(2).item()
+        total_norm_sqr += param_norm ** 2
+    return total_norm_sqr ** 0.5
+
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -820,16 +869,35 @@ def main():
         with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
             f.write(args_text)
 
+    # if utils.is_primary(args) and args.log_wandb:
+    #     if has_wandb:
+    #         assert not args.wandb_resume_id or args.resume
+    #         wandb.init(project=args.experiment, config=args, tags=args.wandb_tags,
+    #                    resume='must' if args.wandb_resume_id else None,
+    #                    id=args.wandb_resume_id if args.wandb_resume_id else None)
+    #     else:
+    #         _logger.warning(
+    #             "You've requested to log metrics to wandb but package not found. "
+    #             "Metrics not being logged to wandb, try `pip install wandb`")
+
+    # QWER
     if utils.is_primary(args) and args.log_wandb:
-        if has_wandb:
-            assert not args.wandb_resume_id or args.resume
-            wandb.init(project=args.experiment, config=args, tags=args.wandb_tags,
-                       resume='must' if args.wandb_resume_id else None,
-                       id=args.wandb_resume_id if args.wandb_resume_id else None)
-        else:
-            _logger.warning(
-                "You've requested to log metrics to wandb but package not found. "
-                "Metrics not being logged to wandb, try `pip install wandb`")
+            if has_wandb:
+                assert not args.wandb_resume_id or args.resume
+                run_name = f"{args.model}_lr{args.lr:.6f}"
+                wandb.init(
+                    project=args.experiment,
+                    name=run_name,
+                    config=args,
+                    tags=args.wandb_tags,
+                    resume='must' if args.wandb_resume_id else None,
+                    id=args.wandb_resume_id if args.wandb_resume_id else None
+                )
+                wandb.config.update({"model": args.model, "learning_rate": args.lr})  # Extra metadata
+            else:
+                _logger.warning(
+                    "WandB logging requested but `wandb` package not installed. Try `pip install wandb`."
+                )
 
     # setup learning rate schedule and starting epoch
     updates_per_epoch = (len(loader_train) + args.grad_accum_steps - 1) // args.grad_accum_steps
@@ -933,9 +1001,13 @@ def main():
             else:
                 latest_metric = train_metrics[eval_metric]
 
-            if saver is not None:
-                # save proper checkpoint with eval metric
-                best_metric, best_epoch = saver.save_checkpoint(epoch, metric=latest_metric)
+            # if saver is not None:
+            #     # save proper checkpoint with eval metric
+            #     best_metric, best_epoch = saver.save_checkpoint(epoch, metric=latest_metric)
+
+            # QWER
+            if saver is not None and epoch % (num_epochs // 5) == 0:  # Every epoch/5
+                saver.save_checkpoint(epoch, metric=latest_metric)
 
             if lr_scheduler is not None:
                 # step LR for next epoch
@@ -1043,8 +1115,23 @@ def train_one_epoch(
                     create_graph=second_order,
                     need_update=need_update,
                 )
+                print("GRAD NORM IS NOT LOGGED PROPERLY")
             else:
                 _loss.backward(create_graph=second_order)
+
+                # QWER: log gradient norms
+                total_grad_norm = compute_grad_norms(model)
+                layer_grad_norms = compute_layer_grad_norms(model)
+                total_param_norm = compute_param_norm(model)
+                
+                if utils.is_primary(args) and args.log_wandb:
+                    # Log total and per-layer gradient norms
+                    wandb.log({
+                        'train/grad_norm_total': total_grad_norm,
+                        'train/param_norm': total_param_norm,
+                        **{f'train/grad_norm_{layer}': norm for layer, norm in layer_grad_norms.items()}
+                    })
+
                 if need_update:
                     if args.clip_grad is not None:
                         utils.dispatch_clip_grad(
@@ -1113,6 +1200,14 @@ def train_one_epoch(
                         normalize=True
                     )
 
+            if utils.is_primary(args) and args.log_wandb:
+                wandb.log({
+                    'train/epoch': epoch,
+                    'train/step': num_updates,
+                    'train/loss': losses_m.val,
+                    'train/lr': optimizer.param_groups[0]['lr'],
+                })
+
         if saver is not None and args.recovery_interval and (
                 (update_idx + 1) % args.recovery_interval == 0):
             saver.save_recovery(epoch, batch_idx=update_idx)
@@ -1132,6 +1227,7 @@ def train_one_epoch(
         # synchronize avg loss, each process keeps its own running avg
         loss_avg = torch.tensor([loss_avg], device=device, dtype=torch.float32)
         loss_avg = utils.reduce_tensor(loss_avg, args.world_size).item()
+
     return OrderedDict([('loss', loss_avg)])
 
 

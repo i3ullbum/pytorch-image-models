@@ -24,7 +24,7 @@ for model in "${models[@]}"; do
       --drop-path 0.1 \
       --seed 1234 \
       --log-interval 1 \
-      --output ./output/${model}_lr${lr} \
+      --output ./output/imagenet1k/${model}_lr${lr} \
       --log-wandb \
       --experiment IMAGENET1K
   done

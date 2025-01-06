@@ -884,7 +884,8 @@ def main():
     if utils.is_primary(args) and args.log_wandb:
             if has_wandb:
                 assert not args.wandb_resume_id or args.resume
-                run_name = f"{args.model}_lr{args.lr:.6f}"
+                current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+                run_name = f"{args.model}_lr{args.lr:.6f}_{current_time}"
                 wandb.init(
                     project=args.experiment,
                     name=run_name,

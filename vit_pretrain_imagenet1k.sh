@@ -14,7 +14,7 @@ for model in "${models[@]}"; do
       --mean 0.485 0.456 0.406 --std 0.229 0.224 0.225 \
       --num-classes 1000 \
       --img-size 224 \
-      --batch-size 4096 \
+      --batch-size 512 \ # 4096/8
       --epochs 300 \
       --lr $lr \
       --warmup-epochs 5 \

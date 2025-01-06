@@ -1,7 +1,9 @@
 #!/bin/bash
 
 models=("vit_tiny_patch16_224" "vit_small_patch16_224" "vit_base_patch16_224")
-lrs=("1e-4" "3e-4" "1e-3" "3e-3" "1e-2")
+lrs=("3e-3")
+# lrs=("1e-4" "3e-4" "1e-3" "3e-3" "1e-2")
+
 
 for model in "${models[@]}"; do
   for lr in "${lrs[@]}"; do

@@ -18,6 +18,7 @@ for model in "${models[@]}"; do
       --lr $lr \
       --warmup-epochs 5 \
       --weight-decay 0.3 \
+      --clip-grad 1.0 \
       --smoothing 0.1 \
       --sched cosine \
       --opt adamw \

@@ -216,8 +216,8 @@ class PostBlock(nn.Module):
         self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.drop_path1(self.ls1(self.norm1(self.attn(x)))) # attn LN residual_add
-        x = x + self.drop_path2(self.ls2(self.norm2(self.mlp(x)))) # mlp LN residual_add
+        x = self.norm1(x + self.drop_path1(self.ls1(self.attn(x)))) # attn LN residual_add
+        x = self.norm2(x + self.drop_path2(self.ls2(self.attn(x)))) # attn LN residual_add
         return x
  
 

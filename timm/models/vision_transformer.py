@@ -2430,16 +2430,16 @@ def vit_small_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
 
 # QWER
 @register_model
-def vit_small_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+def vit_small_patch16_224_post(pretrained: bool = False, **kwargs) -> VisionTransformer:
     model_args = dict(patch_size=16, embed_dim=384, depth=12, num_heads=6, block_fn=PostBlock)
-    model = _create_vision_transformer('vit_small_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    model = _create_vision_transformer('vit_small_patch16_224_post', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 
 # QWER
 @register_model
-def vit_small_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+def vit_small_patch16_224_peri(pretrained: bool = False, **kwargs) -> VisionTransformer:
     model_args = dict(patch_size=16, embed_dim=384, depth=12, num_heads=6, block_fn=PeriBlock)
-    model = _create_vision_transformer('vit_small_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    model = _create_vision_transformer('vit_small_patch16_224_peri', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 
 

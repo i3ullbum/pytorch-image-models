@@ -217,7 +217,7 @@ class PostBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.norm1(x + self.drop_path1(self.ls1(self.attn(x)))) # attn LN residual_add
-        x = self.norm2(x + self.drop_path2(self.ls2(self.attn(x)))) # attn LN residual_add
+        x = self.norm2(x + self.drop_path2(self.ls2(self.mlp(x)))) # attn LN residual_add
         return x
  
 

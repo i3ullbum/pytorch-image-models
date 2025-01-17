@@ -869,17 +869,6 @@ def main():
         with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
             f.write(args_text)
 
-    # if utils.is_primary(args) and args.log_wandb:
-    #     if has_wandb:
-    #         assert not args.wandb_resume_id or args.resume
-    #         wandb.init(project=args.experiment, config=args, tags=args.wandb_tags,
-    #                    resume='must' if args.wandb_resume_id else None,
-    #                    id=args.wandb_resume_id if args.wandb_resume_id else None)
-    #     else:
-    #         _logger.warning(
-    #             "You've requested to log metrics to wandb but package not found. "
-    #             "Metrics not being logged to wandb, try `pip install wandb`")
-
     # QWER
     if utils.is_primary(args) and args.log_wandb:
             if has_wandb:
@@ -1116,20 +1105,21 @@ def train_one_epoch(
             else:
                 _loss.backward(create_graph=second_order)
 
-                # QWER: log gradient norms
-                total_grad_norm = compute_grad_norms(model)
-                layer_grad_norms = compute_layer_grad_norms(model)
-                total_param_norm = compute_param_norm(model)
-                
-                if utils.is_primary(args) and args.log_wandb:
-                    # Log total and per-layer gradient norms
-                    wandb.log({
-                        'train/grad_norm': total_grad_norm,
-                        'train/param_norm': total_param_norm,
-                        **{f'train_layer_grad_norm/{layer}': norm for layer, norm in layer_grad_norms.items()}
-                    })
-
                 if need_update:
+                    if update_idx % args.log_interval == 0:
+                        # ---- Compute & log the grad norms here (BEFORE step) ----
+                        total_grad_norm = compute_grad_norms(model)
+                        layer_grad_norms = compute_layer_grad_norms(model)
+                        total_param_norm = compute_param_norm(model)
+
+                        if utils.is_primary(args) and args.log_wandb:
+                            wandb.log({
+                                'train/grad_norm': total_grad_norm,
+                                'train/param_norm': total_param_norm,
+                                **{f'train_layer_grad_norm/{layer}': norm 
+                                for layer, norm in layer_grad_norms.items()}
+                            })
+
                     if args.clip_grad is not None:
                         utils.dispatch_clip_grad(
                             model_parameters(model, exclude_head='agc' in args.clip_mode),
